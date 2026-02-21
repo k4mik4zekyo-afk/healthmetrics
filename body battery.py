@@ -87,6 +87,34 @@ bb_rows = []
 bb_df = pd.DataFrame(columns=["timestamp", "date_assigned", "body_battery"])
 
 # -----------------------------
+# ACTIVITIES
+# -----------------------------
+print("Fetching activities...")
+raw_activities = client.get_activities_by_date(START_DATE, END_DATE, sortorder="asc")
+activity_rows = []
+for act in raw_activities:
+    act_type = act.get("activityType", {})
+    start_local = act.get("startTimeLocal", "")
+    date_assigned = start_local[:10] if len(start_local) >= 10 else None
+    duration_sec = act.get("duration")
+    activity_rows.append({
+        "activity_id": act.get("activityId"),
+        "activity_name": act.get("activityName"),
+        "activity_type": act_type.get("typeKey", "unknown"),
+        "start_time": start_local,
+        "duration_minutes": round(duration_sec / 60, 2) if duration_sec else None,
+        "distance_meters": act.get("distance"),
+        "calories": act.get("calories"),
+        "average_hr": act.get("averageHR"),
+        "max_hr": act.get("maxHR"),
+        "date_assigned": date_assigned,
+    })
+
+activity_df = pd.DataFrame(activity_rows)
+activity_df.to_csv(f"{OUTPUT_DIR}/activities.csv", index=False)
+print(f"  Found {len(activity_rows)} activities.")
+
+# -----------------------------
 # SLEEP EVENTS
 # -----------------------------
 sleep_rows = []
