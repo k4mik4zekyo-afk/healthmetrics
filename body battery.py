@@ -167,11 +167,14 @@ while current <= end:
                 date_assigned = end_ts.date()
             else:
                 date_assigned = current.date()
+            # Extract sleep score from Garmin's sleepScores object
+            sleep_score = dto.get("sleepScores", {}).get("overall", {}).get("value")
             sleep_rows.append({
                 "sleep_start": start_ts,
                 "sleep_end": end_ts,
                 "duration_minutes": duration_minutes,
                 "bb_gain": bb_gain,
+                "sleep_score": sleep_score,
                 "date_assigned": date_assigned
             })
         elif duration_minutes is not None and duration_minutes > 0:

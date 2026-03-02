@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 import pandas as pd
@@ -119,7 +120,7 @@ with st.sidebar:
 
 # ── tabs ─────────────────────────────────────────────────────────────────────
 
-tab_act, tab_sleep = st.tabs(["Activities", "Sleep & Rest"])
+tab_act, tab_sleep, tab_model = st.tabs(["Activities", "Sleep & Rest", "Sleep Model"])
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB 1 – ACTIVITIES
@@ -250,3 +251,104 @@ with tab_sleep:
                  "min_min", "max_min", "std_min"]
             ]
             st.dataframe(nap_stats_df, use_container_width=True, hide_index=True)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAB 3 – SLEEP MODEL
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@st.cache_data
+def load_model_features():
+    path = os.path.join(DATA_DIR, "model_features.csv")
+    if not os.path.exists(path):
+        return pd.DataFrame()
+    return pd.read_csv(path)
+
+
+@st.cache_data
+def load_model_results():
+    path = os.path.join(DATA_DIR, "model_results.json")
+    if not os.path.exists(path):
+        return None
+    with open(path) as f:
+        return json.load(f)
+
+
+with tab_model:
+    st.header("Sleep Prediction Model")
+
+    if st.button("Build Model"):
+        with st.spinner("Building features and training models..."):
+            result = subprocess.run(
+                ["python", os.path.join(os.path.dirname(__file__), "sleep_model.py")],
+                capture_output=True, text=True,
+                cwd=os.path.dirname(__file__),
+            )
+        if result.returncode == 0:
+            st.success("Model built successfully!")
+            st.cache_data.clear()
+        else:
+            st.error("Model build failed.")
+            st.code(result.stderr[-2000:] if result.stderr else result.stdout[-2000:])
+
+    features = load_model_features()
+    model_results = load_model_results()
+
+    if features.empty and model_results is None:
+        st.info(
+            "No model results yet. Click **Build Model** to generate features "
+            "and train the sleep prediction models.\n\n"
+            "**Prerequisites:** Run **Refresh Data** first to ensure Garmin "
+            "data is available. Optionally place a `caffeine.csv` in "
+            "`garmin_exports/` for caffeine features."
+        )
+    else:
+        # Feature table
+        if not features.empty:
+            st.subheader("Feature Table")
+            st.dataframe(features, use_container_width=True, hide_index=True)
+
+        # Model results
+        if model_results and "models" in model_results:
+            feature_cols = model_results.get("feature_columns", [])
+
+            for model_key, label in [
+                ("sleep_score", "Sleep Score (Linear Regression)"),
+                ("sleep_hrs", "Sleep Hours (Linear Regression)"),
+                ("sleep_gt_7hrs", "Sleep > 7 Hours (Logistic Regression)"),
+            ]:
+                m = model_results["models"].get(model_key, {})
+                if m.get("skipped"):
+                    st.subheader(label)
+                    st.warning(f"Skipped: {m.get('reason', 'insufficient data')}")
+                    continue
+
+                if "coefficients" not in m:
+                    continue
+
+                st.subheader(label)
+
+                # Metric
+                if "r2" in m:
+                    c1, c2 = st.columns(2)
+                    c1.metric("R²", f"{m['r2']:.4f}")
+                    c2.metric("Samples", m.get("n_samples", "?"))
+                elif "accuracy" in m:
+                    c1, c2 = st.columns(2)
+                    c1.metric("Accuracy", f"{m['accuracy']:.4f}")
+                    c2.metric("Samples", m.get("n_samples", "?"))
+
+                # Coefficients table
+                coef_df = pd.DataFrame([
+                    {"Feature": "intercept", "Coefficient": m.get("intercept", 0)}
+                ] + [
+                    {"Feature": f, "Coefficient": c}
+                    for f, c in m["coefficients"].items()
+                ])
+                st.dataframe(coef_df, use_container_width=True, hide_index=True)
+
+                # Bar chart of coefficient magnitudes
+                chart_data = pd.DataFrame({
+                    "Coefficient": m["coefficients"]
+                })
+                st.bar_chart(chart_data)
