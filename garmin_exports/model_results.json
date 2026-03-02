@@ -1,0 +1,50 @@
+{
+  "feature_columns": [
+    "rest_hrs",
+    "low_stress_hrs",
+    "med_stress_hrs",
+    "high_stress_hrs",
+    "in_activity_hrs",
+    "had_activity"
+  ],
+  "models": {
+    "sleep_score": {
+      "skipped": true,
+      "reason": "only 0 valid samples"
+    },
+    "sleep_hrs": {
+      "type": "linear_regression",
+      "target": "sleep_hrs",
+      "r2": 0.3271,
+      "intercept": 7.7417,
+      "coefficients": {
+        "rest_hrs": -0.0717,
+        "low_stress_hrs": -0.1897,
+        "med_stress_hrs": 0.2541,
+        "high_stress_hrs": -0.2678,
+        "in_activity_hrs": 0.0,
+        "had_activity": 0.0
+      },
+      "n_samples": 21
+    },
+    "sleep_gt_7hrs": {
+      "type": "logistic_regression",
+      "target": "sleep_gt_7hrs",
+      "accuracy": 0.7619,
+      "intercept": 1.1589,
+      "coefficients": {
+        "rest_hrs": -0.3357,
+        "low_stress_hrs": -0.4627,
+        "med_stress_hrs": 0.6133,
+        "high_stress_hrs": -0.3988,
+        "in_activity_hrs": 0.0,
+        "had_activity": 0.0
+      },
+      "n_samples": 21,
+      "class_distribution": {
+        "0": 14,
+        "1": 7
+      }
+    }
+  }
+}
