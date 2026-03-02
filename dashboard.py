@@ -328,27 +328,40 @@ with tab_model:
 
                 st.subheader(label)
 
-                # Metric
+                # Metrics row
                 if "r2" in m:
-                    c1, c2 = st.columns(2)
+                    c1, c2, c3, c4 = st.columns(4)
                     c1.metric("R²", f"{m['r2']:.4f}")
-                    c2.metric("Samples", m.get("n_samples", "?"))
+                    c2.metric("Adj R²", f"{m.get('r2_adj', 0):.4f}")
+                    fp = m.get("f_pvalue")
+                    c3.metric("F p-value", f"{fp:.4f}" if fp is not None else "N/A")
+                    c4.metric("Samples", m.get("n_samples", "?"))
                 elif "accuracy" in m:
-                    c1, c2 = st.columns(2)
+                    c1, c2, c3 = st.columns(3)
                     c1.metric("Accuracy", f"{m['accuracy']:.4f}")
-                    c2.metric("Samples", m.get("n_samples", "?"))
+                    c2.metric("Pseudo R²", f"{m.get('pseudo_r2', 0):.4f}")
+                    c3.metric("Samples", m.get("n_samples", "?"))
 
-                # Coefficients table
-                coef_df = pd.DataFrame([
-                    {"Feature": "intercept", "Coefficient": m.get("intercept", 0)}
-                ] + [
-                    {"Feature": f, "Coefficient": c}
-                    for f, c in m["coefficients"].items()
-                ])
+                # Coefficients table with p-values and confidence intervals
+                coef_rows = []
+                for f, v in m["coefficients"].items():
+                    if isinstance(v, dict):
+                        coef_rows.append({
+                            "Feature": f,
+                            "Coefficient": v["coef"],
+                            "p-value": v["p_value"],
+                            "CI Low": v["ci_low"],
+                            "CI High": v["ci_high"],
+                            "Significant": "Yes" if v["p_value"] < 0.05 else "",
+                        })
+                    else:
+                        coef_rows.append({"Feature": f, "Coefficient": v})
+                coef_df = pd.DataFrame(coef_rows)
                 st.dataframe(coef_df, use_container_width=True, hide_index=True)
 
-                # Bar chart of coefficient magnitudes
-                chart_data = pd.DataFrame({
-                    "Coefficient": m["coefficients"]
-                })
-                st.bar_chart(chart_data)
+                # Bar chart of coefficient values
+                if coef_rows and "Coefficient" in coef_rows[0]:
+                    chart_data = pd.DataFrame({
+                        "Coefficient": {r["Feature"]: r["Coefficient"] for r in coef_rows}
+                    })
+                    st.bar_chart(chart_data)

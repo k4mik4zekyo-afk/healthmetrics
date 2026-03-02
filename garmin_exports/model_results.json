@@ -15,35 +15,74 @@
     "sleep_hrs": {
       "type": "linear_regression",
       "target": "sleep_hrs",
-      "r2": 0.3271,
-      "intercept": 7.7417,
+      "r2": 0.4866,
+      "r2_adj": 0.3582,
+      "f_pvalue": 0.0236,
+      "intercept": 7.7375,
+      "n_samples": 21,
       "coefficients": {
-        "rest_hrs": -0.0717,
-        "low_stress_hrs": -0.1897,
-        "med_stress_hrs": 0.2541,
-        "high_stress_hrs": -0.2678,
-        "in_activity_hrs": 0.0,
-        "had_activity": 0.0
-      },
-      "n_samples": 21
+        "rest_hrs": {
+          "coef": -0.16,
+          "p_value": 0.2351,
+          "ci_low": -0.435,
+          "ci_high": 0.1149
+        },
+        "low_stress_hrs": {
+          "coef": -0.0078,
+          "p_value": 0.9577,
+          "ci_low": -0.3158,
+          "ci_high": 0.3002
+        },
+        "med_stress_hrs": {
+          "coef": 0.0569,
+          "p_value": 0.7557,
+          "ci_low": -0.3239,
+          "ci_high": 0.4377
+        },
+        "high_stress_hrs": {
+          "coef": -0.4413,
+          "p_value": 0.0032,
+          "ci_low": -0.7108,
+          "ci_high": -0.1718
+        }
+      }
     },
     "sleep_gt_7hrs": {
       "type": "logistic_regression",
       "target": "sleep_gt_7hrs",
-      "accuracy": 0.7619,
-      "intercept": 1.1589,
-      "coefficients": {
-        "rest_hrs": -0.3357,
-        "low_stress_hrs": -0.4627,
-        "med_stress_hrs": 0.6133,
-        "high_stress_hrs": -0.3988,
-        "in_activity_hrs": 0.0,
-        "had_activity": 0.0
-      },
+      "pseudo_r2": 0.4808,
+      "accuracy": 0.8571,
+      "intercept": 5.0908,
       "n_samples": 21,
       "class_distribution": {
         "0": 14,
         "1": 7
+      },
+      "coefficients": {
+        "rest_hrs": {
+          "coef": -1.0772,
+          "p_value": 0.1442,
+          "ci_low": -2.523,
+          "ci_high": 0.3687
+        },
+        "low_stress_hrs": {
+          "coef": -0.0054,
+          "p_value": 0.9935,
+          "ci_low": -1.309,
+          "ci_high": 1.2982
+        },
+        "med_stress_hrs": {
+          "coef": 0.8643,
+          "p_value": 0.2766,
+          "ci_low": -0.6927,
+          "ci_high": 2.4213
+        },
+        "high_stress_hrs": {
+          "coef": -2.9181,
+          "p_value": 0.1078,
+          "ci_low": -6.4745,
+          "ci_high": 0.6382
+        }
       }
     }
   }

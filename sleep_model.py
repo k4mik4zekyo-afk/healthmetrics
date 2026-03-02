@@ -22,8 +22,7 @@ import sys
 
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import LinearRegression, LogisticRegression
-from sklearn.metrics import accuracy_score, r2_score
+import statsmodels.api as sm
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "garmin_exports")
 
@@ -151,16 +150,16 @@ def build_features(stress_df, sleep_df, act_df, caffeine_df):
         # Activity windows for this date
         act_wins = act_windows_by_date.get(date, [])
 
-        # Classify each reading
+        # Classify each reading (thresholds match Garmin UI categories)
         counts = {"rest": 0, "low": 0, "medium": 0, "high": 0, "in_activity": 0}
         for _, r in measured.iterrows():
             if _in_any_window(r["timestamp"], act_wins):
                 counts["in_activity"] += 1
-            elif r["stress_level"] < 15:
+            elif r["stress_level"] <= 25:
                 counts["rest"] += 1
-            elif r["stress_level"] < 30:
+            elif r["stress_level"] <= 50:
                 counts["low"] += 1
-            elif r["stress_level"] < 50:
+            elif r["stress_level"] <= 75:
                 counts["medium"] += 1
             else:
                 counts["high"] += 1
@@ -211,6 +210,29 @@ def build_features(stress_df, sleep_df, act_df, caffeine_df):
 # ── model training ───────────────────────────────────────────────────────────
 
 
+def _ols_result_to_dict(res, feature_cols, target):
+    """Extract a statsmodels OLS result into a serializable dict."""
+    ci = res.conf_int()
+    return {
+        "type": "linear_regression",
+        "target": target,
+        "r2": round(res.rsquared, 4),
+        "r2_adj": round(res.rsquared_adj, 4),
+        "f_pvalue": round(res.f_pvalue, 4) if not np.isnan(res.f_pvalue) else None,
+        "intercept": round(res.params["const"], 4),
+        "n_samples": int(res.nobs),
+        "coefficients": {
+            f: {
+                "coef": round(res.params[f], 4),
+                "p_value": round(res.pvalues[f], 4),
+                "ci_low": round(ci.loc[f, 0], 4),
+                "ci_high": round(ci.loc[f, 1], 4),
+            }
+            for f in feature_cols
+        },
+    }
+
+
 def train_models(features_df):
     """Train three models and return a results dict."""
 
@@ -226,89 +248,78 @@ def train_models(features_df):
 
     results = {"feature_columns": feature_cols, "models": {}}
 
-    # ── Model 1: Linear regression → sleep_score ──
+    def _usable_cols(df, cols):
+        """Drop columns with zero variance (e.g. all zeros when no activities)."""
+        return [c for c in cols if df[c].nunique() > 1]
+
+    # ── Model 1: OLS → sleep_score ──
     target = "sleep_score"
     df_m = features_df.dropna(subset=[target] + feature_cols)
     if len(df_m) >= 5:
-        X, y = df_m[feature_cols].values, df_m[target].values
-        model = LinearRegression().fit(X, y)
-        y_pred = model.predict(X)
-        r2 = r2_score(y, y_pred)
-        results["models"]["sleep_score"] = {
-            "type": "linear_regression",
-            "target": target,
-            "r2": round(r2, 4),
-            "intercept": round(model.intercept_, 4),
-            "coefficients": {f: round(c, 4) for f, c in zip(feature_cols, model.coef_)},
-            "n_samples": len(df_m),
-        }
+        used = _usable_cols(df_m, feature_cols)
+        X = sm.add_constant(df_m[used].astype(float))
+        y = df_m[target].astype(float)
+        res = sm.OLS(y, X).fit()
+        results["models"]["sleep_score"] = _ols_result_to_dict(res, used, target)
         print(f"\n{'='*60}")
-        print(f"Model 1: Linear Regression → {target}")
+        print(f"Model 1: OLS → {target}")
         print(f"{'='*60}")
-        print(f"  Samples: {len(df_m)}")
-        print(f"  R²:      {r2:.4f}")
-        print(f"  Intercept: {model.intercept_:.4f}")
-        for f, c in zip(feature_cols, model.coef_):
-            print(f"  {f:40s} {c:+.4f}")
+        print(res.summary())
     else:
         print(f"\n⚠️  Skipping sleep_score model: only {len(df_m)} samples (need ≥5)")
         results["models"]["sleep_score"] = {"skipped": True, "reason": f"only {len(df_m)} valid samples"}
 
-    # ── Model 2: Linear regression → sleep_hrs ──
+    # ── Model 2: OLS → sleep_hrs ──
     target = "sleep_hrs"
     df_m = features_df.dropna(subset=[target] + feature_cols)
     if len(df_m) >= 5:
-        X, y = df_m[feature_cols].values, df_m[target].values
-        model = LinearRegression().fit(X, y)
-        y_pred = model.predict(X)
-        r2 = r2_score(y, y_pred)
-        results["models"]["sleep_hrs"] = {
-            "type": "linear_regression",
-            "target": target,
-            "r2": round(r2, 4),
-            "intercept": round(model.intercept_, 4),
-            "coefficients": {f: round(c, 4) for f, c in zip(feature_cols, model.coef_)},
-            "n_samples": len(df_m),
-        }
+        used = _usable_cols(df_m, feature_cols)
+        X = sm.add_constant(df_m[used].astype(float))
+        y = df_m[target].astype(float)
+        res = sm.OLS(y, X).fit()
+        results["models"]["sleep_hrs"] = _ols_result_to_dict(res, used, target)
         print(f"\n{'='*60}")
-        print(f"Model 2: Linear Regression → {target}")
+        print(f"Model 2: OLS → {target}")
         print(f"{'='*60}")
-        print(f"  Samples: {len(df_m)}")
-        print(f"  R²:      {r2:.4f}")
-        print(f"  Intercept: {model.intercept_:.4f}")
-        for f, c in zip(feature_cols, model.coef_):
-            print(f"  {f:40s} {c:+.4f}")
+        print(res.summary())
     else:
         print(f"\n⚠️  Skipping sleep_hrs model: only {len(df_m)} samples (need ≥5)")
         results["models"]["sleep_hrs"] = {"skipped": True, "reason": f"only {len(df_m)} valid samples"}
 
-    # ── Model 3: Logistic regression → sleep_gt_7hrs ──
+    # ── Model 3: Logit → sleep_gt_7hrs ──
     target = "sleep_gt_7hrs"
     df_m = features_df.dropna(subset=[target] + feature_cols)
     if len(df_m) >= 5 and df_m[target].nunique() > 1:
-        X, y = df_m[feature_cols].values, df_m[target].astype(int).values
-        model = LogisticRegression(max_iter=1000).fit(X, y)
-        y_pred = model.predict(X)
-        acc = accuracy_score(y, y_pred)
+        used = _usable_cols(df_m, feature_cols)
+        X = sm.add_constant(df_m[used].astype(float))
+        y = df_m[target].astype(int)
+        res = sm.Logit(y, X).fit(disp=0)
+        y_pred = (res.predict(X) >= 0.5).astype(int)
+        acc = (y_pred == y).mean()
+        ci = res.conf_int()
         results["models"]["sleep_gt_7hrs"] = {
             "type": "logistic_regression",
             "target": target,
+            "pseudo_r2": round(res.prsquared, 4),
             "accuracy": round(acc, 4),
-            "intercept": round(model.intercept_[0], 4),
-            "coefficients": {f: round(c, 4) for f, c in zip(feature_cols, model.coef_[0])},
-            "n_samples": len(df_m),
+            "intercept": round(res.params["const"], 4),
+            "n_samples": int(res.nobs),
             "class_distribution": {str(k): int(v) for k, v in zip(*np.unique(y, return_counts=True))},
+            "coefficients": {
+                f: {
+                    "coef": round(res.params[f], 4),
+                    "p_value": round(res.pvalues[f], 4),
+                    "ci_low": round(ci.loc[f, 0], 4),
+                    "ci_high": round(ci.loc[f, 1], 4),
+                }
+                for f in used
+            },
         }
         print(f"\n{'='*60}")
-        print(f"Model 3: Logistic Regression → {target}")
+        print(f"Model 3: Logit → {target}")
         print(f"{'='*60}")
-        print(f"  Samples:  {len(df_m)}")
-        print(f"  Accuracy: {acc:.4f}")
-        dist = dict(zip(*np.unique(y, return_counts=True)))
-        print(f"  Classes:  0={dist.get(0,0)}, 1={dist.get(1,0)}")
-        print(f"  Intercept: {model.intercept_[0]:.4f}")
-        for f, c in zip(feature_cols, model.coef_[0]):
-            print(f"  {f:40s} {c:+.4f}")
+        print(res.summary())
+        print(f"\n  Accuracy: {acc:.4f}")
     else:
         reason = f"only {len(df_m)} samples" if len(df_m) < 5 else "only one class present"
         print(f"\n⚠️  Skipping sleep_gt_7hrs model: {reason}")

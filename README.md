@@ -17,7 +17,7 @@ Garmin health data export and interactive dashboard. Pulls activity, sleep, stre
 
 2. Install dependencies:
    ```bash
-   pip install streamlit pandas pytz python-dotenv garminconnect python-dateutil scikit-learn
+   pip install streamlit pandas pytz python-dotenv garminconnect python-dateutil statsmodels
    ```
 
 3. Create a `.env` file in the project root with your Garmin credentials:
@@ -77,11 +77,11 @@ Click **Build Model** in the tab to generate the feature table and train the mod
 
 The script `sleep_model.py` builds a daily feature table from your Garmin data:
 
-**Stress features (waking hours only, 5 categories):**
-- `rest_hrs` — stress < 15
-- `low_stress_hrs` — stress 15-29
-- `med_stress_hrs` — stress 30-49
-- `high_stress_hrs` — stress 50+ (not during a recorded activity)
+**Stress features (waking hours only, 5 categories matching Garmin UI):**
+- `rest_hrs` — stress 1-25
+- `low_stress_hrs` — stress 26-50
+- `med_stress_hrs` — stress 51-75
+- `high_stress_hrs` — stress 76-100 (not during a recorded activity)
 - `in_activity_hrs` — any stress reading during a Garmin activity window
 
 **Activity feature:**
