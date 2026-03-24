@@ -12,7 +12,7 @@ load_dotenv()  # looks for .env in current & parent dirs
 # CONFIG
 # -----------------------------
 START_DATE = "2026-01-01"
-END_DATE   = "2026-01-22"
+END_DATE   = "2026-03-01"
 TIMEZONE   = "America/Los_Angeles"
 
 BB_MIN_GAIN_NAP = 5          # body battery points

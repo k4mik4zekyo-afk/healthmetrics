@@ -1,2 +1,5 @@
 .env
 .venv
+garmin_exports/*.csv
+garmin_exports/*.json
+garmin_exports/*.png
